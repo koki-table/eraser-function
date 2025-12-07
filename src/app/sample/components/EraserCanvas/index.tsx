@@ -10,7 +10,9 @@ const CANVAS_HEIGHT = 600
 export default function EraserCanvas() {
   const {
     isEraserMode,
-    lines,
+    restoreLines,
+    deleteLines,
+    restoreEraseLines,
     stageRef,
     toggleEraserMode,
     resetCanvas,
@@ -69,16 +71,31 @@ export default function EraserCanvas() {
           onMouseup={handleMouseUp}
           ref={stageRef}
         >
+          {/* 復元レイヤー: 復元線の部分のみオリジナル画像を表示 */}
           <Layer>
-            {backgroundImageRef.current && (
+            {restoreLines.map((line, i) => (
+              <Line
+                key={`restore-${i}`}
+                points={line.points}
+                stroke={line.stroke}
+                strokeWidth={line.strokeWidth}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation="source-over"
+              />
+            ))}
+            {backgroundImageRef.current && restoreLines.length > 0 && (
               <KonvaImage
                 image={backgroundImageRef.current}
                 width={CANVAS_WIDTH}
                 height={CANVAS_HEIGHT}
+                globalCompositeOperation="source-in"
               />
             )}
           </Layer>
           
+          {/* メインレイヤー: 背景削除済み画像 + 削除マスク + 復元消去線 */}
           <Layer>
             {foregroundImageRef.current && (
               <KonvaImage
@@ -87,19 +104,28 @@ export default function EraserCanvas() {
                 height={CANVAS_HEIGHT}
               />
             )}
-          </Layer>
-
-          <Layer>
-            {lines.map((line, i) => (
+            {deleteLines.map((line, i) => (
               <Line
-                key={i}
+                key={`delete-${i}`}
                 points={line.points}
                 stroke={line.stroke}
                 strokeWidth={line.strokeWidth}
                 tension={0.5}
                 lineCap="round"
                 lineJoin="round"
-                globalCompositeOperation={line.globalCompositeOperation}
+                globalCompositeOperation="source-over"
+              />
+            ))}
+            {restoreEraseLines.map((line, i) => (
+              <Line
+                key={`restore-erase-${i}`}
+                points={line.points}
+                stroke={line.stroke}
+                strokeWidth={line.strokeWidth}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation="destination-out"
               />
             ))}
           </Layer>
