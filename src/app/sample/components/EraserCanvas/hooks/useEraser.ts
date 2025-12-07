@@ -7,10 +7,17 @@ interface EraserState {
   lines: any[]
 }
 
+interface LineData {
+  points: number[]
+  globalCompositeOperation: 'source-over' | 'destination-out'
+  stroke: string
+  strokeWidth: number
+}
+
 export const useEraser = () => {
   const [state, setState] = useState<EraserState>({
     isDrawing: false,
-    isEraserMode: true,
+    isEraserMode: false, // falseが削除モード、trueが復元モード
     lines: []
   })
   
@@ -36,7 +43,7 @@ export const useEraser = () => {
     isDrawing.current = true
     const pos = e.target.getStage().getPointerPosition()
     
-    const newLine = {
+    const newLine: LineData = {
       points: [pos.x, pos.y],
       globalCompositeOperation: state.isEraserMode ? 'destination-out' : 'source-over',
       stroke: state.isEraserMode ? '#000000' : '#ffffff',

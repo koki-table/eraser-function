@@ -28,23 +28,23 @@ export default function Controls({
     <Box>
       <Stack direction="row" spacing={2} alignItems="center">
         <Chip 
-          label={isEraserMode ? '消しゴムモード' : '復元モード'}
-          color={isEraserMode ? 'error' : 'primary'}
+          label={isEraserMode ? '復元モード' : '削除モード'}
+          color={isEraserMode ? 'primary' : 'error'}
           variant="filled"
           size="small"
         />
         
         <Button
-          variant={isEraserMode ? 'contained' : 'outlined'}
+          variant={!isEraserMode ? 'contained' : 'outlined'}
           color="error"
           startIcon={<Eraser size={20} />}
           onClick={onToggleEraser}
         >
-          消しゴム
+          削除
         </Button>
 
         <Button
-          variant={!isEraserMode ? 'contained' : 'outlined'}
+          variant={isEraserMode ? 'contained' : 'outlined'}
           color="primary"
           startIcon={<PaintBrush size={20} />}
           onClick={onToggleEraser}
