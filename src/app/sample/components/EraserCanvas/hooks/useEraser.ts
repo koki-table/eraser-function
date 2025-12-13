@@ -69,60 +69,50 @@ export const useEraser = () => {
       isDrawing.current = true;
       const pos = e.target.getStage().getPointerPosition();
 
-      // メインの描画線を作成
-      const newLine: LineData = {
+      // ヘルパー関数: 線オブジェクト生成
+      const createLine = (
+        stroke: string,
+        operation: "source-over" | "destination-out",
+        type: string
+      ): LineData => ({
         points: [pos.x, pos.y],
-        globalCompositeOperation: "source-over",
-        stroke:
-          state.currentMode === EraserMode.Restore ? "#000000" : "#ffffff", // 復元は黒、削除は白
+        globalCompositeOperation: operation,
+        stroke,
         strokeWidth: 20,
-        type: state.currentMode === EraserMode.Restore ? "restore" : "delete",
-      };
+        type: type as LineData["type"],
+      });
 
-      // 復元モードの場合、削除線を消すためのラインも同時作成
-      // destination-outで既存の削除線（白いライン）を透明化
-      const restoreEraseLine: LineData | null =
-        state.currentMode === EraserMode.Restore
-          ? {
-              points: [pos.x, pos.y],
-              globalCompositeOperation: "destination-out",
-              stroke: "#000000",
-              strokeWidth: 20,
-              type: "restoreErase",
-            }
-          : null;
+      // 復元モードの処理
+      if (state.currentMode === EraserMode.Restore) {
+        const mainLine = createLine("#000000", "source-over", "restore");
+        const eraseLine = createLine(
+          "#000000",
+          "destination-out",
+          "restoreErase"
+        );
 
-      // 削除モードの場合、クリッピングマスクを消すためのラインも同時作成
-      // destination-outで既存のクリッピングマスク（復元線）を透明化
-      const clipMaskEraseLine: LineData | null =
-        state.currentMode === EraserMode.Delete
-          ? {
-              points: [pos.x, pos.y],
-              globalCompositeOperation: "destination-out",
-              stroke: "#000000",
-              strokeWidth: 20,
-              type: "clipMaskErase",
-            }
-          : null;
+        lastLine.current = mainLine;
+        setState((prev) => ({
+          ...prev,
+          restoreLines: [...prev.restoreLines, mainLine],
+          restoreDeleteLines: [...prev.restoreDeleteLines, eraseLine],
+        }));
+        return;
+      }
 
-      lastLine.current = newLine;
+      // 削除モードの処理
+      const mainLine = createLine("#ffffff", "source-over", "delete");
+      const eraseLine = createLine(
+        "#000000",
+        "destination-out",
+        "clipMaskErase"
+      );
+
+      lastLine.current = mainLine;
       setState((prev) => ({
         ...prev,
-        // モードに応じて適切な配列に線を追加
-        restoreLines:
-          state.currentMode === EraserMode.Restore
-            ? [...prev.restoreLines, newLine]
-            : prev.restoreLines,
-        deleteLines:
-          state.currentMode === EraserMode.Delete
-            ? [...prev.deleteLines, newLine]
-            : prev.deleteLines,
-        restoreDeleteLines: restoreEraseLine
-          ? [...prev.restoreDeleteLines, restoreEraseLine]
-          : prev.restoreDeleteLines,
-        clipMaskEraseLines: clipMaskEraseLine
-          ? [...prev.clipMaskEraseLines, clipMaskEraseLine]
-          : prev.clipMaskEraseLines,
+        deleteLines: [...prev.deleteLines, mainLine],
+        clipMaskEraseLines: [...prev.clipMaskEraseLines, eraseLine],
       }));
     },
     [state.currentMode]
