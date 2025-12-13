@@ -1,15 +1,22 @@
 import { Box, Button, Chip, Stack } from '@mui/material'
 import { Eraser, PaintBrush, ArrowClockwise, Download } from '@phosphor-icons/react'
+import { EraserMode, EraserModeType } from '../EraserCanvas/hooks/useEraser'
 
 interface ControlsProps {
-  isEraserMode: boolean
+  currentMode: EraserModeType
   onToggleEraser: () => void
   onReset: () => void
   onSave: () => string | null
 }
 
+// モード表示用の定数
+const ModeLabels = {
+  [EraserMode.Delete]: '削除モード',
+  [EraserMode.Restore]: '復元モード'
+} as const
+
 export default function Controls({ 
-  isEraserMode, 
+  currentMode, 
   onToggleEraser, 
   onReset, 
   onSave 
@@ -28,14 +35,14 @@ export default function Controls({
     <Box>
       <Stack direction="row" spacing={2} alignItems="center">
         <Chip 
-          label={isEraserMode ? '復元モード' : '削除モード'}
-          color={isEraserMode ? 'primary' : 'error'}
+          label={ModeLabels[currentMode]}
+          color={currentMode === EraserMode.Restore ? 'primary' : 'error'}
           variant="filled"
           size="small"
         />
         
         <Button
-          variant={!isEraserMode ? 'contained' : 'outlined'}
+          variant={currentMode === EraserMode.Delete ? 'contained' : 'outlined'}
           color="error"
           startIcon={<Eraser size={20} />}
           onClick={onToggleEraser}
@@ -44,7 +51,7 @@ export default function Controls({
         </Button>
 
         <Button
-          variant={isEraserMode ? 'contained' : 'outlined'}
+          variant={currentMode === EraserMode.Restore ? 'contained' : 'outlined'}
           color="primary"
           startIcon={<PaintBrush size={20} />}
           onClick={onToggleEraser}

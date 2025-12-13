@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Stage, Layer, Image as KonvaImage, Line } from 'react-konva'
 import { Box } from '@mui/material'
-import { useEraser } from './hooks/useEraser'
+import { useEraser, EraserMode } from './hooks/useEraser'
 import Controls from '../Controls'
 
 const CANVAS_WIDTH = 800
@@ -10,7 +10,7 @@ const CANVAS_HEIGHT = 600
 export default function EraserCanvas() {
   // 消しゴム機能の状態とイベントハンドラを取得
   const {
-    isEraserMode,     // 現在のモード（true:復元、false:削除）
+    currentMode,      // 現在のモード（EraserMode.Delete | EraserMode.Restore）
     restoreLines,     // 復元用の線データ配列
     deleteLines,      // 削除用の線データ配列
     restoreEraseLines, // 復元時の削除線消去用配列
@@ -54,7 +54,7 @@ export default function EraserCanvas() {
   return (
     <Box>
       <Controls
-        isEraserMode={isEraserMode}
+        currentMode={currentMode}
         onToggleEraser={toggleEraserMode}
         onReset={resetCanvas}
         onSave={saveImage}
