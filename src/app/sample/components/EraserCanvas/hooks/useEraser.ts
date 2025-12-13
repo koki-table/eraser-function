@@ -7,6 +7,18 @@ export const EraserMode = {
   Restore: "restore",
 } as const;
 
+// 描画操作タイプの定数
+export const LineType = {
+  ClipMask: "clipMask",
+  Delete: "delete",
+} as const;
+
+// 合成操作の定数
+export const CompositeOperation = {
+  SourceOver: "source-over",
+  DestinationOut: "destination-out",
+} as const;
+
 export type EraserModeType = (typeof EraserMode)[keyof typeof EraserMode];
 
 interface EraserState {
@@ -18,10 +30,10 @@ interface EraserState {
 
 interface LineData {
   points: number[];
-  globalCompositeOperation: "source-over" | "destination-out";
+  globalCompositeOperation: (typeof CompositeOperation)[keyof typeof CompositeOperation];
   stroke: string;
   strokeWidth: number;
-  type: "clipMask" | "delete";
+  type: (typeof LineType)[keyof typeof LineType];
 }
 
 /**
@@ -68,20 +80,28 @@ export const useEraser = () => {
       // 線オブジェクト生成
       const createLine = (
         stroke: string,
-        operation: "source-over" | "destination-out",
-        type: string
+        operation: (typeof CompositeOperation)[keyof typeof CompositeOperation],
+        type: (typeof LineType)[keyof typeof LineType]
       ): LineData => ({
         points: [pos.x, pos.y],
         globalCompositeOperation: operation,
         stroke,
         strokeWidth: 20,
-        type: type as LineData["type"],
+        type,
       });
 
       // 復元モードの処理
       if (state.currentMode === EraserMode.Restore) {
-        const clipMaskLine = createLine("#000000", "source-over", "clipMask");
-        const deleteLine = createLine("#ffffff", "destination-out", "delete");
+        const clipMaskLine = createLine(
+          "#000000",
+          CompositeOperation.SourceOver,
+          LineType.ClipMask
+        );
+        const deleteLine = createLine(
+          "#ffffff",
+          CompositeOperation.DestinationOut,
+          LineType.Delete
+        );
 
         lastLine.current = clipMaskLine;
         setState((prev) => ({
@@ -93,8 +113,16 @@ export const useEraser = () => {
       }
 
       // 削除モードの処理
-      const deleteLine = createLine("#ffffff", "source-over", "delete");
-      const clipMaskLine = createLine("#000000", "destination-out", "clipMask");
+      const deleteLine = createLine(
+        "#ffffff",
+        CompositeOperation.SourceOver,
+        LineType.Delete
+      );
+      const clipMaskLine = createLine(
+        "#000000",
+        CompositeOperation.DestinationOut,
+        LineType.ClipMask
+      );
 
       lastLine.current = deleteLine;
       setState((prev) => ({
