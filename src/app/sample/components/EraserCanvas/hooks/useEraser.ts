@@ -12,9 +12,8 @@ export type EraserModeType = (typeof EraserMode)[keyof typeof EraserMode];
 interface EraserState {
   isDrawing: boolean;
   currentMode: EraserModeType;
-  restoreLines: LineData[]; // 復元用の線
+  clipMaskLines: LineData[]; // クリッピングマスク統合管理用の線
   deleteLines: LineData[]; // 削除・復元統合管理用の線
-  clipMaskEraseLines: LineData[]; // 削除時にクリッピングマスクを消すための線
 }
 
 interface LineData {
@@ -22,21 +21,19 @@ interface LineData {
   globalCompositeOperation: "source-over" | "destination-out";
   stroke: string;
   strokeWidth: number;
-  type: "restore" | "delete" | "clipMaskErase";
+  type: "clipMask" | "delete";
 }
 
+/**
+ * 消しゴム機能用のカスタムフック
+ */
 export const useEraser = () => {
-  // 消しゴム機能の状態管理
   const [state, setState] = useState<EraserState>({
     isDrawing: false,
     currentMode: EraserMode.Delete, // デフォルトは削除モード
-    restoreLines: [], // 復元時に描画する線（オリジナル画像をマスク表示用）
-    deleteLines: [], // 削除・復元統合管理用の線
-    clipMaskEraseLines: [], // 削除時にクリッピングマスクを消すための線
+    clipMaskLines: [], // クリッピングマスク用の線
+    deleteLines: [], // 削除用の線
   });
-
-  console.log(state);
-  
 
   const stageRef = useRef<Konva.Stage>(null);
   const isDrawing = useRef(false);
@@ -57,9 +54,8 @@ export const useEraser = () => {
   const resetCanvas = useCallback(() => {
     setState((prev) => ({
       ...prev,
-      restoreLines: [],
+      clipMaskLines: [],
       deleteLines: [],
-      clipMaskEraseLines: [],
     }));
   }, []);
 
@@ -69,7 +65,7 @@ export const useEraser = () => {
       isDrawing.current = true;
       const pos = e.target.getStage().getPointerPosition();
 
-      // ヘルパー関数: 線オブジェクト生成
+      // 線オブジェクト生成
       const createLine = (
         stroke: string,
         operation: "source-over" | "destination-out",
@@ -84,35 +80,27 @@ export const useEraser = () => {
 
       // 復元モードの処理
       if (state.currentMode === EraserMode.Restore) {
-        const mainLine = createLine("#000000", "source-over", "restore");
-        const deleteLine = createLine(
-          "#ffffff",
-          "destination-out",
-          "delete"
-        );
+        const clipMaskLine = createLine("#000000", "source-over", "clipMask");
+        const deleteLine = createLine("#ffffff", "destination-out", "delete");
 
-        lastLine.current = mainLine;
+        lastLine.current = clipMaskLine;
         setState((prev) => ({
           ...prev,
-          restoreLines: [...prev.restoreLines, mainLine],
+          clipMaskLines: [...prev.clipMaskLines, clipMaskLine],
           deleteLines: [...prev.deleteLines, deleteLine],
         }));
         return;
       }
 
       // 削除モードの処理
-      const mainLine = createLine("#ffffff", "source-over", "delete");
-      const eraseLine = createLine(
-        "#000000",
-        "destination-out",
-        "clipMaskErase"
-      );
+      const deleteLine = createLine("#ffffff", "source-over", "delete");
+      const clipMaskLine = createLine("#000000", "destination-out", "clipMask");
 
-      lastLine.current = mainLine;
+      lastLine.current = deleteLine;
       setState((prev) => ({
         ...prev,
-        deleteLines: [...prev.deleteLines, mainLine],
-        clipMaskEraseLines: [...prev.clipMaskEraseLines, eraseLine],
+        deleteLines: [...prev.deleteLines, deleteLine],
+        clipMaskLines: [...prev.clipMaskLines, clipMaskLine],
       }));
     },
     [state.currentMode]
@@ -136,16 +124,14 @@ export const useEraser = () => {
       };
 
       setState((prev) => {
-        // 復元モード：復元線と削除線を更新
+        // 復元モード：クリッピングマスク線と削除線を更新
         if (state.currentMode === EraserMode.Restore) {
-          if (prev.restoreLines.length === 0) return prev;
+          if (prev.clipMaskLines.length === 0) return prev;
 
           return {
             ...prev,
-            restoreLines: addPointToLastLine(prev.restoreLines),
+            clipMaskLines: addPointToLastLine(prev.clipMaskLines),
             deleteLines: addPointToLastLine(prev.deleteLines),
-            // 参照を更新して再レンダリングを強制
-            clipMaskEraseLines: [...prev.clipMaskEraseLines]
           };
         }
 
@@ -156,7 +142,7 @@ export const useEraser = () => {
           return {
             ...prev,
             deleteLines: addPointToLastLine(prev.deleteLines),
-            clipMaskEraseLines: addPointToLastLine(prev.clipMaskEraseLines),
+            clipMaskLines: addPointToLastLine(prev.clipMaskLines),
           };
         }
 

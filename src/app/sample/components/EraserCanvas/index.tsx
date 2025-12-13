@@ -11,9 +11,8 @@ export default function EraserCanvas() {
   // 消しゴム機能の状態とイベントハンドラを取得
   const {
     currentMode, // 現在のモード（EraserMode.Delete | EraserMode.Restore）
-    restoreLines, // 復元用の線データ配列
+    clipMaskLines, // クリッピングマスク統合管理用の線データ配列
     deleteLines, // 削除・復元統合管理用の線データ配列
-    clipMaskEraseLines, // 削除時のクリッピングマスク消去用配列
     stageRef,
     toggleEraserMode,
     resetCanvas,
@@ -76,36 +75,23 @@ export default function EraserCanvas() {
           onMouseup={handleMouseUp} // 描画終了イベント
           ref={stageRef}
         >
-          {/* 復元レイヤー: 復元線の部分のみオリジナル画像を表示 */}
+          {/* クリッピングマスクレイヤー: マスクの部分のみオリジナル画像を表示 */}
           <Layer>
-            {/* 復元線を描画（マスクとして使用） */}
-            {restoreLines.map((line, i) => (
+            {/* クリッピングマスク用のライン */}
+            {clipMaskLines.map((line, i) => (
               <Line
-                key={`restore-${i}`}
+                key={`clipMask-${i}`}
                 points={line.points}
                 stroke={line.stroke}
                 strokeWidth={line.strokeWidth}
                 tension={0.5}
                 lineCap="round"
                 lineJoin="round"
-                globalCompositeOperation="source-over" // 通常描画
+                globalCompositeOperation={line.globalCompositeOperation}
               />
             ))}
-            {/* クリッピングマスク除去線でクリッピングマスクを削除 */}
-            {clipMaskEraseLines.map((line, i) => (
-              <Line
-                key={`clipMaskErase-${i}`}
-                points={line.points}
-                stroke={line.stroke}
-                strokeWidth={line.strokeWidth}
-                tension={0.5}
-                lineCap="round"
-                lineJoin="round"
-                globalCompositeOperation="destination-out" // 既存のマスクを消去
-              />
-            ))}
-            {/* 復元線がある場合のみ、その形状でオリジナル画像をクリッピング表示 */}
-            {backgroundImageRef.current && restoreLines.length > 0 && (
+            {/* クリッピングマスクラインがある場合のみ、その形状でオリジナル画像をクリッピング表示 */}
+            {backgroundImageRef.current && clipMaskLines.length > 0 && (
               <KonvaImage
                 image={backgroundImageRef.current}
                 width={CANVAS_WIDTH}
@@ -126,7 +112,7 @@ export default function EraserCanvas() {
             )}
           </Layer>
 
-          {/* 削除・復元統合レイヤー */}
+          {/* 削除レイヤー（白いライン） */}
           <Layer>
             {deleteLines.map((line, i) => (
               <Line
