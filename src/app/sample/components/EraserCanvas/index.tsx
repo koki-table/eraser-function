@@ -14,6 +14,7 @@ export default function EraserCanvas() {
     restoreLines,     // 復元用の線データ配列
     deleteLines,      // 削除用の線データ配列
     restoreEraseLines, // 復元時の削除線消去用配列
+    clipMaskEraseLines, // 削除時のクリッピングマスク消去用配列
     stageRef,
     toggleEraserMode,
     resetCanvas,
@@ -89,6 +90,19 @@ export default function EraserCanvas() {
                 lineCap="round"
                 lineJoin="round"
                 globalCompositeOperation="source-over"  // 通常描画
+              />
+            ))}
+            {/* クリッピングマスク除去線でクリッピングマスクを削除 */}
+            {clipMaskEraseLines.map((line, i) => (
+              <Line
+                key={`clipMaskErase-${i}`}
+                points={line.points}
+                stroke={line.stroke}
+                strokeWidth={line.strokeWidth}
+                tension={0.5}
+                lineCap="round"
+                lineJoin="round"
+                globalCompositeOperation="destination-out"  // 既存のマスクを消去
               />
             ))}
             {/* 復元線がある場合のみ、その形状でオリジナル画像をクリッピング表示 */}

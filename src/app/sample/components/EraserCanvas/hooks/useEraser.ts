@@ -7,6 +7,7 @@ interface EraserState {
   restoreLines: LineData[] // 復元用の線
   deleteLines: LineData[]  // 削除用の線
   restoreEraseLines: LineData[] // 復元時に削除線を消すための線
+  clipMaskEraseLines: LineData[] // 削除時にクリッピングマスクを消すための線
 }
 
 interface LineData {
@@ -14,7 +15,7 @@ interface LineData {
   globalCompositeOperation: 'source-over' | 'destination-out'
   stroke: string
   strokeWidth: number
-  type: 'restore' | 'delete' | 'restoreErase'
+  type: 'restore' | 'delete' | 'restoreErase' | 'clipMaskErase'
 }
 
 export const useEraser = () => {
@@ -24,7 +25,8 @@ export const useEraser = () => {
     isEraserMode: false, // falseが削除モード、trueが復元モード
     restoreLines: [],     // 復元時に描画する線（オリジナル画像をマスク表示用）
     deleteLines: [],      // 削除時に描画する白い線（背景削除済み画像を隠す用）
-    restoreEraseLines: [] // 復元時に削除線を消すための透明化線
+    restoreEraseLines: [], // 復元時に削除線を消すための透明化線
+    clipMaskEraseLines: [] // 削除時にクリッピングマスクを消すための線
   })
   
   const stageRef = useRef<Konva.Stage>(null)
@@ -45,7 +47,8 @@ export const useEraser = () => {
       ...prev,
       restoreLines: [],
       deleteLines: [],
-      restoreEraseLines: []
+      restoreEraseLines: [],
+      clipMaskEraseLines: []
     }))
   }, [])
 
@@ -72,6 +75,16 @@ export const useEraser = () => {
       strokeWidth: 20,
       type: 'restoreErase'
     } : null
+
+    // 削除モードの場合、クリッピングマスクを消すためのラインも同時作成
+    // destination-outで既存のクリッピングマスク（復元線）を透明化
+    const clipMaskEraseLine: LineData | null = !state.isEraserMode ? {
+      points: [pos.x, pos.y],
+      globalCompositeOperation: 'destination-out',
+      stroke: '#000000',
+      strokeWidth: 20,
+      type: 'clipMaskErase'
+    } : null
     
     lastLine.current = newLine
     setState(prev => ({
@@ -79,7 +92,8 @@ export const useEraser = () => {
       // モードに応じて適切な配列に線を追加
       restoreLines: state.isEraserMode ? [...prev.restoreLines, newLine] : prev.restoreLines,
       deleteLines: !state.isEraserMode ? [...prev.deleteLines, newLine] : prev.deleteLines,
-      restoreEraseLines: restoreEraseLine ? [...prev.restoreEraseLines, restoreEraseLine] : prev.restoreEraseLines
+      restoreEraseLines: restoreEraseLine ? [...prev.restoreEraseLines, restoreEraseLine] : prev.restoreEraseLines,
+      clipMaskEraseLines: clipMaskEraseLine ? [...prev.clipMaskEraseLines, clipMaskEraseLine] : prev.clipMaskEraseLines
     }))
   }, [state.isEraserMode])
 
@@ -94,6 +108,7 @@ export const useEraser = () => {
       const newRestoreLines = [...prev.restoreLines]
       const newDeleteLines = [...prev.deleteLines]
       const newRestoreEraseLines = [...prev.restoreEraseLines]
+      const newClipMaskEraseLines = [...prev.clipMaskEraseLines]
       
       if (state.isEraserMode && newRestoreLines.length > 0) {
         // 復元モード：復元線にポイント追加
@@ -109,13 +124,20 @@ export const useEraser = () => {
         // 削除モード：削除線にポイント追加
         const currentLine = newDeleteLines[newDeleteLines.length - 1]
         currentLine.points = [...currentLine.points, point.x, point.y]
+
+        // クリッピングマスク除去線も同じポイントを追加（復元線と同じ軌跡で消去）
+        if (newClipMaskEraseLines.length > 0) {
+          const currentClipMaskEraseLine = newClipMaskEraseLines[newClipMaskEraseLines.length - 1]
+          currentClipMaskEraseLine.points = [...currentClipMaskEraseLine.points, point.x, point.y]
+        }
       }
       
       return {
         ...prev,
         restoreLines: newRestoreLines,
         deleteLines: newDeleteLines,
-        restoreEraseLines: newRestoreEraseLines
+        restoreEraseLines: newRestoreEraseLines,
+        clipMaskEraseLines: newClipMaskEraseLines
       }
     })
   }, [state.isEraserMode])
