@@ -123,10 +123,9 @@ export const useEraser = () => {
     (e: any) => {
       if (!isDrawing.current) return;
 
-      const point = e.target.getStage().getPointerPosition();
-
       // ヘルパー関数: 配列の最後の線にポイントを追加
       const addPointToLastLine = (lines: LineData[]) => {
+        const point = e.target.getStage().getPointerPosition();
         if (lines.length === 0) return lines;
         const lastIndex = lines.length - 1;
         return lines.map((line, index) =>
