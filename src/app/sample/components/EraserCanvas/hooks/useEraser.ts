@@ -13,8 +13,7 @@ interface EraserState {
   isDrawing: boolean;
   currentMode: EraserModeType;
   restoreLines: LineData[]; // 復元用の線
-  deleteLines: LineData[]; // 削除用の線
-  restoreDeleteLines: LineData[]; // 復元時に削除線を消すための線
+  deleteLines: LineData[]; // 削除・復元統合管理用の線
   clipMaskEraseLines: LineData[]; // 削除時にクリッピングマスクを消すための線
 }
 
@@ -23,7 +22,7 @@ interface LineData {
   globalCompositeOperation: "source-over" | "destination-out";
   stroke: string;
   strokeWidth: number;
-  type: "restore" | "delete" | "restoreErase" | "clipMaskErase";
+  type: "restore" | "delete" | "clipMaskErase";
 }
 
 export const useEraser = () => {
@@ -32,10 +31,12 @@ export const useEraser = () => {
     isDrawing: false,
     currentMode: EraserMode.Delete, // デフォルトは削除モード
     restoreLines: [], // 復元時に描画する線（オリジナル画像をマスク表示用）
-    deleteLines: [], // 削除時に描画する白い線（背景削除済み画像を隠す用）
-    restoreDeleteLines: [], // 復元時に削除線を消すための透明化線
+    deleteLines: [], // 削除・復元統合管理用の線
     clipMaskEraseLines: [], // 削除時にクリッピングマスクを消すための線
   });
+
+  console.log(state);
+  
 
   const stageRef = useRef<Konva.Stage>(null);
   const isDrawing = useRef(false);
@@ -58,7 +59,6 @@ export const useEraser = () => {
       ...prev,
       restoreLines: [],
       deleteLines: [],
-      restoreDeleteLines: [],
       clipMaskEraseLines: [],
     }));
   }, []);
@@ -85,17 +85,17 @@ export const useEraser = () => {
       // 復元モードの処理
       if (state.currentMode === EraserMode.Restore) {
         const mainLine = createLine("#000000", "source-over", "restore");
-        const eraseLine = createLine(
-          "#000000",
+        const deleteLine = createLine(
+          "#ffffff",
           "destination-out",
-          "restoreErase"
+          "delete"
         );
 
         lastLine.current = mainLine;
         setState((prev) => ({
           ...prev,
           restoreLines: [...prev.restoreLines, mainLine],
-          restoreDeleteLines: [...prev.restoreDeleteLines, eraseLine],
+          deleteLines: [...prev.deleteLines, deleteLine],
         }));
         return;
       }
@@ -136,14 +136,16 @@ export const useEraser = () => {
       };
 
       setState((prev) => {
-        // 復元モード：復元線と削除線消去線を更新
+        // 復元モード：復元線と削除線を更新
         if (state.currentMode === EraserMode.Restore) {
           if (prev.restoreLines.length === 0) return prev;
 
           return {
             ...prev,
             restoreLines: addPointToLastLine(prev.restoreLines),
-            restoreDeleteLines: addPointToLastLine(prev.restoreDeleteLines),
+            deleteLines: addPointToLastLine(prev.deleteLines),
+            // 参照を更新して再レンダリングを強制
+            clipMaskEraseLines: [...prev.clipMaskEraseLines]
           };
         }
 
