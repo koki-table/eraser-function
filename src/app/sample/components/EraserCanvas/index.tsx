@@ -13,7 +13,7 @@ export default function EraserCanvas() {
     currentMode,      // 現在のモード（EraserMode.Delete | EraserMode.Restore）
     restoreLines,     // 復元用の線データ配列
     deleteLines,      // 削除用の線データ配列
-    restoreEraseLines, // 復元時の削除線消去用配列
+    restoreDeleteLines, // 復元時の削除線消去用配列
     clipMaskEraseLines, // 削除時のクリッピングマスク消去用配列
     stageRef,
     toggleEraserMode,
@@ -140,7 +140,7 @@ export default function EraserCanvas() {
               />
             ))}
             {/* 復元消去線で削除線（白い線）を透明化 */}
-            {restoreEraseLines.map((line, i) => (
+            {restoreDeleteLines.map((line, i) => (
               <Line
                 key={`restore-erase-${i}`}
                 points={line.points}
