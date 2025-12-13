@@ -1,86 +1,197 @@
-import { useState, useRef, useCallback } from 'react'
-import Konva from 'konva'
+import { useState, useRef, useCallback } from "react";
+import Konva from "konva";
+
+// モード定数
+export const EraserMode = {
+  Delete: "delete",
+  Restore: "restore",
+} as const;
+
+// 描画操作タイプの定数
+export const LineType = {
+  ClipMask: "clipMask",
+  Delete: "delete",
+} as const;
+
+// 合成操作の定数
+export const CompositeOperation = {
+  SourceOver: "source-over",
+  DestinationOut: "destination-out",
+} as const;
+
+export type EraserModeType = (typeof EraserMode)[keyof typeof EraserMode];
 
 interface EraserState {
-  isDrawing: boolean
-  isEraserMode: boolean
-  lines: any[]
+  isDrawing: boolean;
+  currentMode: EraserModeType;
+  clipMaskLines: LineData[]; // クリッピングマスク統合管理用の線
+  deleteLines: LineData[]; // 削除・復元統合管理用の線
 }
 
+interface LineData {
+  points: number[];
+  globalCompositeOperation: (typeof CompositeOperation)[keyof typeof CompositeOperation];
+  stroke: string;
+  strokeWidth: number;
+  type: (typeof LineType)[keyof typeof LineType];
+}
+
+/**
+ * 消しゴム機能用のカスタムフック
+ */
 export const useEraser = () => {
   const [state, setState] = useState<EraserState>({
     isDrawing: false,
-    isEraserMode: true,
-    lines: []
-  })
-  
-  const stageRef = useRef<Konva.Stage>(null)
-  const isDrawing = useRef(false)
-  const lastLine = useRef<any>(null)
+    currentMode: EraserMode.Delete, // デフォルトは削除モード
+    clipMaskLines: [], // クリッピングマスク用の線
+    deleteLines: [], // 削除用の線
+  });
 
+  const stageRef = useRef<Konva.Stage>(null);
+  const isDrawing = useRef(false);
+  const lastLine = useRef<any>(null);
+
+  // 削除モード ⇔ 復元モードの切り替え
   const toggleEraserMode = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      isEraserMode: !prev.isEraserMode
-    }))
-  }, [])
+      currentMode:
+        prev.currentMode === EraserMode.Delete
+          ? EraserMode.Restore
+          : EraserMode.Delete,
+    }));
+  }, []);
 
+  // 全ての描画をリセット
   const resetCanvas = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      lines: []
-    }))
-  }, [])
+      clipMaskLines: [],
+      deleteLines: [],
+    }));
+  }, []);
 
-  const handleMouseDown = useCallback((e: any) => {
-    isDrawing.current = true
-    const pos = e.target.getStage().getPointerPosition()
-    
-    const newLine = {
-      points: [pos.x, pos.y],
-      globalCompositeOperation: state.isEraserMode ? 'destination-out' : 'source-over',
-      stroke: state.isEraserMode ? '#000000' : '#ffffff',
-      strokeWidth: 20,
-    }
-    
-    lastLine.current = newLine
-    setState(prev => ({
-      ...prev,
-      lines: [...prev.lines, newLine]
-    }))
-  }, [state.isEraserMode])
+  // マウス押下時：新しい線の開始
+  const handleMouseDown = useCallback(
+    (e: any) => {
+      isDrawing.current = true;
+      const pos = e.target.getStage().getPointerPosition();
 
-  const handleMouseMove = useCallback((e: any) => {
-    if (!isDrawing.current) return
-    
-    const stage = e.target.getStage()
-    const point = stage.getPointerPosition()
-    
-    setState(prev => {
-      const newLines = [...prev.lines]
-      const currentLine = newLines[newLines.length - 1]
-      
-      if (currentLine) {
-        currentLine.points = [...currentLine.points, point.x, point.y]
+      // 線オブジェクト生成
+      const createLine = (
+        stroke: string,
+        operation: (typeof CompositeOperation)[keyof typeof CompositeOperation],
+        type: (typeof LineType)[keyof typeof LineType]
+      ): LineData => ({
+        points: [pos.x, pos.y],
+        globalCompositeOperation: operation,
+        stroke,
+        strokeWidth: 20,
+        type,
+      });
+
+      // 復元モードの処理
+      if (state.currentMode === EraserMode.Restore) {
+        const clipMaskLine = createLine(
+          "#000000",
+          CompositeOperation.SourceOver,
+          LineType.ClipMask
+        );
+        const deleteLine = createLine(
+          "#ffffff",
+          CompositeOperation.DestinationOut,
+          LineType.Delete
+        );
+
+        lastLine.current = clipMaskLine;
+        setState((prev) => ({
+          ...prev,
+          clipMaskLines: [...prev.clipMaskLines, clipMaskLine],
+          deleteLines: [...prev.deleteLines, deleteLine],
+        }));
+        return;
       }
-      
-      return {
+
+      // 削除モードの処理
+      const deleteLine = createLine(
+        "#ffffff",
+        CompositeOperation.SourceOver,
+        LineType.Delete
+      );
+      const clipMaskLine = createLine(
+        "#000000",
+        CompositeOperation.DestinationOut,
+        LineType.ClipMask
+      );
+
+      lastLine.current = deleteLine;
+      setState((prev) => ({
         ...prev,
-        lines: newLines
-      }
-    })
-  }, [])
+        deleteLines: [...prev.deleteLines, deleteLine],
+        clipMaskLines: [...prev.clipMaskLines, clipMaskLine],
+      }));
+    },
+    [state.currentMode]
+  );
 
+  // マウス移動時：線の継続描画
+  const handleMouseMove = useCallback(
+    (e: any) => {
+      if (!isDrawing.current) return;
+
+      // ヘルパー関数: 配列の最後の線にポイントを追加
+      const addPointToLastLine = (lines: LineData[]) => {
+        const point = e.target.getStage().getPointerPosition();
+        if (lines.length === 0) return lines;
+        const lastIndex = lines.length - 1;
+        return lines.map((line, index) =>
+          index === lastIndex
+            ? { ...line, points: [...line.points, point.x, point.y] }
+            : line
+        );
+      };
+
+      setState((prev) => {
+        // 復元モード：クリッピングマスク線と削除線を更新
+        if (state.currentMode === EraserMode.Restore) {
+          if (prev.clipMaskLines.length === 0) return prev;
+
+          return {
+            ...prev,
+            clipMaskLines: addPointToLastLine(prev.clipMaskLines),
+            deleteLines: addPointToLastLine(prev.deleteLines),
+          };
+        }
+
+        // 削除モード：削除線とクリッピングマスク消去線を更新
+        if (state.currentMode === EraserMode.Delete) {
+          if (prev.deleteLines.length === 0) return prev;
+
+          return {
+            ...prev,
+            deleteLines: addPointToLastLine(prev.deleteLines),
+            clipMaskLines: addPointToLastLine(prev.clipMaskLines),
+          };
+        }
+
+        return prev;
+      });
+    },
+    [state.currentMode]
+  );
+
+  // マウス離上時：描画終了
   const handleMouseUp = useCallback(() => {
-    isDrawing.current = false
-  }, [])
+    isDrawing.current = false;
+  }, []);
 
+  // 現在のキャンバス状態を画像として保存
   const saveImage = useCallback(() => {
-    const stage = stageRef.current
-    if (!stage) return null
-    
-    return stage.toDataURL({ pixelRatio: 2 })
-  }, [])
+    const stage = stageRef.current;
+    if (!stage) return null;
+
+    return stage.toDataURL({ pixelRatio: 2 }); // 高解像度で出力
+  }, []);
 
   return {
     ...state,
@@ -90,6 +201,6 @@ export const useEraser = () => {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
-    saveImage
-  }
-}
+    saveImage,
+  };
+};
